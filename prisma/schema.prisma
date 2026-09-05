@@ -1,0 +1,131 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Khai báo các trạng thái Enum để tái sử dụng
+enum Role {
+  USER
+  ADMIN
+}
+
+enum VideoStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum TransactionType {
+  ADD      // Nạp tiền, nhận khuyến mãi, hoàn tiền
+  DEDUCT   // Trừ tiền khi tạo video
+}
+
+// --------------------------------------------------
+// BẢNG DỮ LIỆU
+// --------------------------------------------------
+
+model User {
+  id                    Int                     @id @default(autoincrement())
+  email                 String                  @unique
+  password              String?                 // Sẽ được mã hóa bcrypt
+  fullName              String?
+  avatar                String?                 @db.Text
+  dob                   DateTime?
+  role                  Role                    @default(USER)
+  creditBalance         Int                     @default(0) // Số dư không được phép âm
+  isActive              Boolean                 @default(true) // Admin có thể khóa tài khoản
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+
+  // Quan hệ (Relations)
+  videos                Video[]
+  transactions          CreditTransaction[]
+  promotionsUsed        PromotionRegistration[]
+  payments              Payment[]
+}
+
+model Video {
+  id          Int         @id @default(autoincrement())
+  userId      Int
+  prompt      String      @db.Text
+  videoUrl    String?     @db.Text
+  status      VideoStatus @default(PENDING)
+  creditCost  Int         // Lưu lại chi phí lúc tạo để nếu lỗi thì hoàn đúng số tiền này
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  user        User        @relation(fields: [userId], references: [id])
+}
+
+model CreditTransaction {
+  id          Int             @id @default(autoincrement())
+  userId      Int
+  amount      Int
+  type        TransactionType
+  reason      String          // VD: "Tạo video #123", "Hoàn tiền video lỗi", "Nạp gói Basic"
+  createdAt   DateTime        @default(now())
+
+  user        User            @relation(fields: [userId], references: [id])
+}
+
+model CreditPackage {
+  id          Int       @id @default(autoincrement())
+  name        String    // VD: "Gói Khởi Động"
+  price       Float     // Giá tiền thật (VND/USD)
+  credits     Int       // Số credit nhận được
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  
+  payments    Payment[]
+}
+
+model Payment {
+  id              Int           @id @default(autoincrement())
+  userId          Int
+  packageId       Int
+  amountPaid      Float
+  paymentStatus   String        // "SUCCESS", "PENDING", "FAILED"
+  createdAt       DateTime      @default(now())
+
+  user            User          @relation(fields: [userId], references: [id])
+  package         CreditPackage @relation(fields: [packageId], references: [id])
+}
+
+model Promotion {
+  id              Int       @id @default(autoincrement())
+  code            String    @unique // VD: "SUMMER2026"
+  rewardCredits   Int       // Số credit được tặng
+  maxUses         Int       // Giới hạn số lượt nhập
+  currentUses     Int       @default(0)
+  startDate       DateTime
+  endDate         DateTime
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+
+  registrations   PromotionRegistration[]
+}
+
+model PromotionRegistration {
+  id            Int       @id @default(autoincrement())
+  userId        Int
+  promotionId   Int
+  createdAt     DateTime  @default(now())
+
+  user          User      @relation(fields: [userId], references: [id])
+  promotion     Promotion @relation(fields: [promotionId], references: [id])
+
+  // Đảm bảo 1 user chỉ được dùng 1 mã khuyến mãi 1 lần
+  @@unique([userId, promotionId]) 
+}
+
+model Setting {
+  id          Int       @id @default(autoincrement())
+  key         String    @unique // VD: "DEFAULT_VIDEO_COST"
+  value       String    // Chuyển kiểu khi dùng (VD: "10")
+  description String?
+  updatedAt   DateTime  @updatedAt
+}
