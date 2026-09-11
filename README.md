@@ -40,4 +40,7 @@ Máy chủ cốt lõi xử lý toàn bộ logic nghiệp vụ, xác thực bảo
  
 ---
  
-*Dự án thuộc Hệ sinh thái AI Video Generator.*
+*Dự án thuộc Hệ sinh thái AI Video Generator:*
+https://github.com/hphuc193/ai-video-python-server
+https://github.com/hphuc193/ai-video-generator-mobile
+https://github.com/hphuc193/video-ai-admin
